@@ -4,8 +4,8 @@ author: "Jessica Lundin and Sage ADTR Science Team"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output: 
   html_document:
-    embed-resources: true
     self_contained: true
+    embed-resources: true
     toc: true
     toc_depth: 2
     toc_float: true
@@ -134,9 +134,9 @@ Any donors who did not fall under these criteria were assigned as “other”.
 **Neuropathological plus clinical AD diagnosis (neuro.path.diag.plus.clinical)**
 To compare analysis results across studies (cross-cohort analysis) we chose to determine AD case/control status according to neuropathological data because cohorts had variable clinical and neuropathologic diagnostic information regarding AD case status. 
 
-*AD diagnosis:* Braak stage ≥ IV and CERAD measure equal to moderate/probable AD or frequent/definite AD. Plus a clinical assessment resulting in a Consensus Cognitive Diagnosis of AD.
+*AD diagnosis:* Braak stage ≥ IV and CERAD measure equal to moderate/probable AD or frequent/definite AD. Plus a clinical assessment resulting in a Consensus Cognitive Diagnosis (cogdx) of AD with no other cause of cognitive impairment (cogdx = 4).
 
-*Control diagnosis:* Braak stage ≤ III and CERAD measure equal to none/no AD or sparse/possible AD. Plus a clinical assessment resulting in a Consensus Cognitive Diagnosis of No Cognitive Impairment.
+*Control diagnosis:* Braak stage ≤ III and CERAD measure equal to none/no AD or sparse/possible AD. Plus a clinical assessment resulting in a Consensus Cognitive Diagnosis of No Cognitive Impairment (cogdx = 1).
 
 Any donors who did not fall under these criteria were assigned as “other”.
 
@@ -151,39 +151,48 @@ Any donors who did not fall under these criteria were assigned as “other”.
 
 # Descriptive: Demographics
 
-```{r generate-demographics-plots, warning=FALSE, message=FALSE}
+```{r generate-demographics-plots, warning=FALSE, message=FALSE, fig.width=12, fig.height=16}
 ## Generate QC plots
 pheno$age_cat <- factor(pheno$age_cat, levels = c("90+","ge85lt90","<85"))
 md_all <- pheno
 md_all$ADdiagnosis <- md_all$diag2
-make_bar_plot(md_all, "tissue2", facet_var = NULL)
-make_bar_plot(md_all, "ADdiagnosis")
-make_bar_plot(md_all, "sex")
-make_bar_plot(md_all, "race")
-make_bar_plot(md_all, "isHispanic")
-make_bar_plot(md_all, "cohort")
-(ggplot(meta_age, aes(x = ageDeath)) + labs(title = "ageDeath")) |>
+p1<-make_bar_plot(md_all, "tissue2", facet_var = NULL)
+p2<-make_bar_plot(md_all, "ADdiagnosis")
+p3<-make_bar_plot(md_all, "sex")
+p4<-make_bar_plot(md_all, "race")
+p5<-make_bar_plot(md_all, "isHispanic")
+p6<-make_bar_plot(md_all, "cohort")
+p7<-(ggplot(meta_age, aes(x = ageDeath)) + labs(title = "ageDeath")) |>
   format_histogram_plot()
-make_bar_plot(md_all, "age_cat")
+p8<-make_bar_plot(md_all, "age_cat")
+
+library(patchwork)
+plot_list <- list(p1, p2, p3, p4, p5, p6, p7, p8 )
+wrap_plots(plot_list, nrow = 4, ncol = 2)
 
 ```
 
 # Descriptive: Technical covariates
 
-```{r generate-technical-covariate-plots, warning=FALSE, message=FALSE}
+```{r generate-technical-covariate-plots, warning=FALSE, message=FALSE, fig.width=12, fig.height=12}
 #make_bar_plot_batch(md_all, "procbatch")
 #make_bar_plot_batch(md_all, "libraryPrep")
 #make_bar_plot_batch(md_all, "final_batch")
 md_all$final_batch <- factor(md_all$final_batch, levels = c("1_0","1_1","1_2","1_3","1_4","1_5","1_6","1_7","1_8","2_1","2_2","2_3","2_9","3_2","3_3","3_4","4_15","4_16"))
-make_bar_plot_batch_fillvar(md_all, "final_batch", facet_var = "tissue", fill_var = "procbatch")
-make_bar_plot_batch_fillvar(md_all, "final_batch", facet_var = "tissue", fill_var = "libraryPrep", color_scale = "brewer")
+p11<-make_bar_plot_batch_fillvar(md_all, "final_batch", facet_var = "tissue", fill_var = "procbatch")
+p12<-make_bar_plot_batch_fillvar(md_all, "final_batch", facet_var = "tissue", fill_var = "libraryPrep", color_scale = "brewer")
 
 
-(ggplot(md_all, aes(x = PMI)) + labs(title = "PMI")) |>
+p13<-(ggplot(md_all, aes(x = PMI)) + labs(title = "PMI")) |>
   format_histogram_plot()
 
-(ggplot(md_all, aes(x = RIN)) + labs(title = "RIN")) |>
+p14<-(ggplot(md_all, aes(x = RIN)) + labs(title = "RIN")) |>
   format_histogram_plot()
+
+library(patchwork)
+combined_fig <- (p11+p12) / (p13 + p14)
+print(combined_fig)
+
 ```
 
 ```{r generate-RIN-plots1, warning=FALSE, message=FALSE}
@@ -696,94 +705,6 @@ tab_summary2 %>%
 
 
 
-```{r RNA metrics as PCA vectors, fig.height=15, fig.width=20, eval = FALSE}
-# RNA metrics as principal components using all 5 brain tissue [not run - see RNA metrics calculated at end]
-
-# PCA of technical metrics
-md_metrics <- md_all
-## run with & md$specimenID != "380_120503" then drop
-
-# "X..of.chimeric.reads" dropped because all valaues were zero - all other retained
-metric_cols2 <- c("picard_UNPAIRED_READS_EXAMINED"           ,        "picard_READ_PAIRS_EXAMINED"       ,    
-"picard_UNMAPPED_READS"                      ,      "picard_PERCENT_DUPLICATION"                      ,
-"picard_READS_UNMAPPED"                       ,     "rsem_alignable_percent"                          ,
-"rsem_uniquely_aligned_percent"                ,    "samtools_reads_mapped"                           ,
-"samtools_reads_duplicated"                     ,   "samtools_error_rate"                             ,
-"samtools_average_length"                 ,         "samtools_average_quality"                        ,
-"samtools_insert_size_average"             ,        "samtools_percentage_of_properly_paired_reads_...",
-"samtools_reads_mapped_percent"             ,       "samtools_reads_mapped_and_paired_percent"        ,
-"samtools_reads_properly_paired_percent"     ,      "samtools_reads_duplicated_percent"               ,
-"samtools_percent_mapped_X"                   ,     "samtools_percent_mapped_Y"                       ,
-"cutadapt_percent_trimmed_R2"                  ,    "cutadapt_percent_trimmed_R1"                     ,
-"cutadapt_mean_percent_trimmed"                 ,   "Average.input.read.length"                       ,
-"Uniquely.mapped.reads.."                        ,  "Number.of.splices..GT.AG"                        ,
-"Number.of.splices..GC.AG"                        , "Number.of.splices..AT.AC"                        ,
-"Mismatch.rate.per.base..."   ,                     "Deletion.rate.per.base"                          ,
-"Insertion.rate.per.base"      ,                    "X..of.reads.mapped.to.multiple.loci"             ,
-"X..of.reads.mapped.to.too.many.loci",              "X..of.reads.unmapped..too.many.mismatches"       ,
-"X..of.reads.unmapped..too.short"     ,             "X..of.reads.unmapped..other"                     )
-
-## adding in technical covariates ----
-# RNA metrics described using PCA
-## RNA metrics PCA to account for technical variability across batches
-#metric_cols <- colnames(md_metrics[,c(33:69)])
-#results_metrics <- compare_methods(md,metric_cols)
-#sig_metrics <- results_metrics %>% filter(p_adj < 0.05) %>% arrange(p_adj) %>% pull(metric)
-#cat("Significant metrics (FDR < 0.05):", length(sig_metrics), "\n")
-
-#rownames(md) <- NULL
-
-library(Polychrome)
-p_colors <- glasbey.colors(19)[-1] #removes first color which is white
-my_shapes <- c(1:19)
-
-
-# ── p3: PC1 vs PC2 scores, coloured by library prep ─────────────────────────
-rownames(md_metrics) <- md_metrics$specimenID
-metric_cols_mat <- md_metrics[,metric_cols2]
-metric_cols_mat <- as.data.frame(metric_cols_mat)
-metric_cols_mat_t <- t(metric_cols_mat)
-
-outlier_list <- list()
-pca_result_outliers <- run_pca_outliers(metric_cols_mat_t,
-                                         md_metrics,
-                                          center = TRUE,
-                                          scale = TRUE,
-                                          n_pcs = 2)
-pca_df <- as.data.frame(pca_result_outliers$scores[,c("specimenID", "PC1","PC2","PC3","PC4","PC5","PC6")])
-
-p1 <- plot_pca(pca_result_outliers, "PC1", "PC2", "final_batch" , title_var = c(paste("MAYO RNA metrics",sep="") ))
-p2 <- plot_pca(pca_result_outliers, "PC3", "PC4", "final_batch" , title_var = c(paste("MAYO RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC5", "PC6", "final_batch" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
- 
-p3a <- plot_pca(pca_result_outliers, "PC1", "PC2", "sex" , title_var = c(paste("MAYO RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC3", "PC4", "sex" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC5", "PC6", "sex" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-
-p3b <- plot_pca(pca_result_outliers, "PC1", "PC2", "diag2" , title_var = c(paste("MAYO RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC3", "PC4", "diag2" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC5", "PC6", "diag2" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-  
-# ── p4: loadings — which metrics drive each PC ───────────────────────────────
-p4 <- plot_pca_loadings2(pca_result_outliers)
-#ggsave(paste("PCA_loadings_both_sexes_DLPFC.png",sep=""), plot =p4, width = 15, height = 10, dpi = 150)
-
-# ── p5: scree plot ────────────────────────────────────────────────────────────
-p5 <- plot_scree(pca_result_outliers)
-#ggsave(paste("PCA_scree_both_sexes_DLPFC.png",sep=""), plot =p5, width = 15, height = 10, dpi = 150)
-
-#png("~/ROSMAP_DLPFC_CN_PCC_RNA_metrics_30July2026.png", width = 1700, height = 1900)
-library(patchwork)
-plot_list <- list(p1,p2,p3a,p3b,p4,p5) 
-wrap_plots(plot_list, nrow = 3, ncol = 2)
-#dev.off()
-
-# metrics_pcs when including all 5 brain tissues in the RNA metrics principal components
-metrics_pca_df <- pca_df %>% dplyr::rename(PC1_metrics_all5 = PC1, PC2_metrics_all5 = PC2, PC3_metrics_all5 = PC3, PC4_metrics_all5 = PC4, PC5_metrics_all5 = PC5) %>% dplyr::select(specimenID, PC1_metrics_all5, PC2_metrics_all5, PC3_metrics_all5, PC4_metrics_all5, PC5_metrics_all5)
-#pheno_metrics_pca <- merge(md, metrics_pca_df, by="specimenID")
-```
-
-
 # Final samples that passed QC
 
 ```{r final-QC-tables-part1-tablesetup-saving-rds, warning=FALSE, message=FALSE}
@@ -917,14 +838,14 @@ Uploaded to synapse: "ROSMAP_md_counts_DLPFC_CN_PCC_TC_FC.rds" (metadata and cou
 *`r nrow(counts)` genes(s)*
 
 ```{r write synapse rds, eval=TRUE, echo=FALSE, include=FALSE, eval=FALSE}
-invisible(synLogin(silent=TRUE))
-data_final <- list("metadata" = md_valid_qc, "counts" = counts[!zeros, ])
+#invisible(synLogin(silent=TRUE))
+#data_final <- list("metadata" = md_valid_qc, "counts" = counts[!zeros, ])
                    #"multiqc_stats" = multiqc_stats,
                    #"fastqc_stats" = fastqc_basic_stats)
-output_filename <- "ROSMAP_md_counts_DLPFC_CN_PCC_TC_FC.rds"
-saveRDS(data_final, file = output_filename)
-synapse_file_object <- File(path = "ROSMAP_md_counts_DLPFC_CN_PCC_TC_FC.rds", parent = "syn75192265")
-synStore(synapse_file_object)
+#output_filename <- "ROSMAP_md_counts_DLPFC_CN_PCC_TC_FC.rds"
+#saveRDS(data_final, file = output_filename)
+#synapse_file_object <- File(path = "ROSMAP_md_counts_DLPFC_CN_PCC_TC_FC.rds", parent = "syn75192265")
+#synStore(synapse_file_object)
 ```
 
 # CQN normalization
@@ -1083,39 +1004,26 @@ kable(
 ```{r RNA metrics as PCA vectors with only DLPFC CN PCC, fig.height=9, fig.width=14}
 invisible(synLogin(silent=TRUE))
 # PCA of technical metrics
+# metric selection minus batch 4
 md_metrics <- md_valid_qc[md_valid_qc$procbatch != "4" ,]
 
-# "X..of.chimeric.reads" dropped because all valaues were zero - all other retained
-metric_cols2 <- c("picard_UNPAIRED_READS_EXAMINED"           ,        "picard_READ_PAIRS_EXAMINED"       ,    
-"picard_UNMAPPED_READS"                      ,      "picard_PERCENT_DUPLICATION"                      ,
-"picard_READS_UNMAPPED"                       ,     "rsem_alignable_percent"                          ,
-"rsem_uniquely_aligned_percent"                ,    "samtools_reads_mapped"                           ,
-"samtools_reads_duplicated"                     ,   "samtools_error_rate"                             ,
-"samtools_average_length"                 ,         "samtools_average_quality"                        ,
-"samtools_insert_size_average"             ,        "samtools_percentage_of_properly_paired_reads_...",
-"samtools_reads_mapped_percent"             ,       "samtools_reads_mapped_and_paired_percent"        ,
-"samtools_reads_properly_paired_percent"     ,      "samtools_reads_duplicated_percent"               ,
-"samtools_percent_mapped_X"                   ,     "samtools_percent_mapped_Y"                       ,
-"cutadapt_percent_trimmed_R2"                  ,    "cutadapt_percent_trimmed_R1"                     ,
-"cutadapt_mean_percent_trimmed"                 ,   "Average.input.read.length"                       ,
-"Uniquely.mapped.reads.."                        ,  "Number.of.splices..GT.AG"                        ,
-"Number.of.splices..GC.AG"                        , "Number.of.splices..AT.AC"                        ,
-"Mismatch.rate.per.base..."   ,                     "Deletion.rate.per.base"                          ,
-"Insertion.rate.per.base"      ,                    "X..of.reads.mapped.to.multiple.loci"             ,
-"X..of.reads.mapped.to.too.many.loci",              "X..of.reads.unmapped..too.many.mismatches"       ,
-"X..of.reads.unmapped..too.short"     ,             "X..of.reads.unmapped..other"                     )
 
-# metric selection minus batch 4
-# first exclude any RNA metric associated with diagnosis
+# first exclude any RNA metric associated with diagnosis or sex
 metrics <- read.csv(synGet("syn76227881")$path, stringsAsFactors = FALSE)
-md_cts <- readRDS(synGet("syn77559653")$path)     # rosmap_md_counts_dlpfc_cn_pcc_tc_fc.rds
+md_cts <- counts[,colnames(counts) %in% md_metrics$specimenID]
 
-out <- qc_diagnosis_assoc(metrics, md_cts$metadata, diagnosis_col = "diagnosis", samples = colnames(counts))
+out <- qc_diagnosis_assoc(metrics, md_metrics, diagnosis_col = "diagnosis", samples = colnames(counts))
 metrics_keep <- out$metrics_keep   # original metrics minus the significant ones (specimenID kept)
 
+out2 <- qc_diagnosis_assoc(metrics, md_metrics, diagnosis_col = "sex", samples = colnames(counts))
+metrics_keep2 <- out2$metrics_keep   # original metrics minus the significant ones (specimenID kept)
+
+metrics_keep <- metrics_keep[colnames(metrics_keep) %in% colnames(metrics_keep2)]
+
+# check for correlation across metrics and keep most significant only
 rosmap_tv <- select_technical_vars(
-   counts          = md_cts$counts,
-   metadata        = md_cts$metadata,
+   counts          = md_cts,
+   metadata        = md_metrics,
   # metrics         = read.csv(synGet("syn76227881")$path, stringsAsFactors = FALSE),
    metrics       =  metrics_keep,
    sample_filter   = function(md) md$procbatch != "4",
@@ -1130,20 +1038,13 @@ rosmap_tv <- select_technical_vars(
  )
 selected_metrics <- rosmap_tv$final_metrics
 
+
 ## adding in technical covariates ----
 # RNA metrics described using PCA
 ## RNA metrics PCA to account for technical variability across batches
-#metric_cols <- colnames(md_metrics[,c(33:69)])
-#results_metrics <- compare_methods(md,metric_cols)
-#sig_metrics <- results_metrics %>% filter(p_adj < 0.05) %>% arrange(p_adj) %>% pull(metric)
-#cat("Significant metrics (FDR < 0.05):", length(sig_metrics), "\n")
-
-#rownames(md) <- NULL
-
 library(Polychrome)
 p_colors <- glasbey.colors(19)[-1] #removes first color which is white
 my_shapes <- c(1:19)
-
 
 # ── p3: PC1 vs PC2 scores, coloured by library prep ─────────────────────────
 rownames(md_metrics) <- md_metrics$specimenID
@@ -1151,7 +1052,7 @@ metric_cols_mat <- md_metrics[,selected_metrics]
 metric_cols_mat <- as.data.frame(metric_cols_mat)
 metric_cols_mat_t <- t(metric_cols_mat)
 
-
+## FIRST check for how many significant PCs using broken stick
 pca_result_outliers <- run_pca_outliers2(metric_cols_mat_t,
                                          md_metrics,
                                          var_cutoff = 0,
@@ -1161,13 +1062,7 @@ pca_result_outliers <- run_pca_outliers2(metric_cols_mat_t,
 eig <- pca_result_outliers$sd_stats$sd^2
 library(vegan)
 bs <- bstick(length(eig), tot.var = sum(eig))
-#for (k in seq_along(eig)) {
-#  cat(sprintf("PC%d: eigenvalue=%.3f  broken-stick=%.3f  %s\n",
-#              k, eig[k], bs[k], ifelse(eig[k] > bs[k], "RETAIN", "drop")))
-#}
 
-#keep  <- eig > bs
-#n_ret <- if (all(keep)) length(eig) else which(!keep)[1] - 1   # consecutive rule
 n_ret <- 4
 pct   <- 100 * sum(eig[seq_len(n_ret)]) / sum(eig)
 
@@ -1179,6 +1074,9 @@ cat(sprintf(
 
 if (n_ret == 0) cat("*No component explained more variance than expected under the broken-stick model.*\n\n")
 # broken stick - end
+
+
+## SECOND run PCA to check for outliers - remove outliers
 rm(outlier_list)
 outlier_list <- list()
 pca_result_outliers <- run_pca_outliers2(metric_cols_mat_t,
@@ -1187,16 +1085,25 @@ pca_result_outliers <- run_pca_outliers2(metric_cols_mat_t,
                                           center = T,
                                           scale = T)
 
-pca_df <- as.data.frame(pca_result_outliers$scores[,c("specimenID", "PC1","PC2","PC3","PC4","PC5","PC6","is_outlier")])
-
-
 id_outliers <- pca_result_outliers$outliers$specimenID
 id_outliers_db <- md_metrics[md_metrics$specimenID %in% id_outliers,]
+md_metrics_minus_outliers <- md_metrics[!(md_metrics$specimenID %in% id_outliers),]
+metric_cols_mat_t_minus_outlier <- metric_cols_mat_t[,!colnames(metric_cols_mat_t) %in% id_outliers]
 
-pca_var <- as.data.frame(pca_result_outliers$var_explained)
+
+## THIRD now with outliers removed, run pca for PCs that represent rna metrics
+pca_result_outliers_forPCs <- run_pca_outliers2(metric_cols_mat_t_minus_outlier,
+                                        md_metrics_minus_outliers,
+                                         var_cutoff = 10,
+                                          center = T,
+                                          scale = T)
+
+pca_df <- as.data.frame(pca_result_outliers_forPCs$scores[,c("specimenID", "PC1","PC2","PC3","PC4","PC5","PC6","is_outlier")])
+
+pca_var <- as.data.frame(pca_result_outliers_forPCs$var_explained)
 pca_var$PC <- rownames(pca_var)
-pca_var$variance <- pca_var$'pca_result_outliers$var_explained'
-pca_var <- pca_var %>% select(-'pca_result_outliers$var_explained') 
+pca_var$variance <- pca_var$'pca_result_outliers_forPCs$var_explained'
+pca_var <- pca_var %>% select(-'pca_result_outliers_forPCs$var_explained') 
 pca_var <- pca_var[1:10,]
 
 pca_var %>%
@@ -1212,35 +1119,20 @@ pca_var %>%
   column_spec(1, width = "2cm")
 
 
-p1 <- plot_pca(pca_result_outliers, "PC1", "PC2", "final_batch" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-p1b <- plot_pca(pca_result_outliers, "PC3", "PC4", "final_batch" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-#p2 <- plot_pca(pca_result_outliers, "PC3", "PC4", "final_batch" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC5", "PC6", "final_batch" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
- 
-p3a <- plot_pca(pca_result_outliers, "PC1", "PC2", "sex" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC3", "PC4", "sex" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC5", "PC6", "sex" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
+p1 <- plot_pca(pca_result_outliers_forPCs, "PC1", "PC2", "final_batch" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
+p1b <- plot_pca(pca_result_outliers_forPCs, "PC3", "PC4", "final_batch" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
+p3a <- plot_pca(pca_result_outliers_forPCs, "PC1", "PC2", "sex" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
+p3b <- plot_pca(pca_result_outliers_forPCs, "PC1", "PC2", "diag2" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
 
-p3b <- plot_pca(pca_result_outliers, "PC1", "PC2", "diag2" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC3", "PC4", "diag2" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-#plot_pca(pca_result_outliers, "PC5", "PC6", "diag2" , title_var = c(paste("ROSMAP RNA metrics",sep="") ))
-  
 # ── p4: loadings — which metrics drive each PC ───────────────────────────────
-p4 <- plot_pca_loadings3(pca_result_outliers, pcs = c("PC1", "PC2", "PC3", "PC4"))
-#p4b <- plot_pca_loadings2(pca_result_outliers, pcs = c("PC1", "PC3"))
-#ggsave(paste("PCA_loadings_both_sexes_DLPFC.png",sep=""), plot =p4, width = 15, height = 10, dpi = 150)
+p4 <- plot_pca_loadings3(pca_result_outliers_forPCs, pcs = c("PC1", "PC2", "PC3", "PC4"))
 
 # ── p5: scree plot ────────────────────────────────────────────────────────────
-p5 <- plot_scree(pca_result_outliers)
-#ggsave(paste("PCA_scree_both_sexes_DLPFC.png",sep=""), plot =p5, width = 15, height = 10, dpi = 150)
+p5 <- plot_scree(pca_result_outliers_forPCs)
 
-#png("~/ROSMAP_DLPFC_CN_PCC_RNA_metrics_30July2026.png", width = 1700, height = 1900)
 library(patchwork)
 plot_list1 <- list(p1,p1b,p3a,p3b) 
 wrap_plots(plot_list1, nrow = 2, ncol = 2)
-#dev.off()
-
-
 
 plot_list2 <- list(p4,p5) 
 wrap_plots(plot_list2, nrow = 1, ncol = 2)
@@ -1255,13 +1147,9 @@ md_valid_qc_metrics_pca <- md_valid_qc_metrics_pca %>% filter(is_pc_metrics_outl
 
 
 ```{r addition sample to drop}
-#id_outliers <- pca_result_outliers$outliers$specimenID
-#id_outliers_db <- md_valid_qc_metrics_pca[md_valid_qc_metrics_pca$specimenID %in% id_outliers,]
 
 addition_drop <- id_outliers_db %>%
    dplyr::select(specimenID, tissue2, sex, diag2, diagnosis, final_batch)
-
-#table(metrics_pca_df$is_pc_metrics_outlier)
 
 addition_drop %>%
   kable(format = "html", 
@@ -1308,7 +1196,7 @@ dge_cqn_df_DLPFC_CN_PCC <- dge_cqn_df[,colnames(dge_cqn_df) %in% md_all_DLPFC_CN
 **Demographics for DLPFC, CN, and PCC (for gene expression models)**
 
 
-```{r final demographics diag2}
+```{r final demographics neuropath only diagnosis}
 # Prepare frequency counts wide by sex
 demo_summary3 <- md_all_DLPFC_CN_PCC %>%
   dplyr::mutate(diag2 = factor(diag2, levels = c("AD2", "CT2", "OTHER2"))) %>%
@@ -1346,7 +1234,7 @@ kable(
   row_spec(0, extra_css = "caption { white-space: nowrap; text-align: left; }")
 ```
 
-```{r final demographics diagnosis}
+```{r final demographics neuropath plus clinical diagnosis}
 # Prepare frequency counts wide by sex
 demo_summary3 <- md_all_DLPFC_CN_PCC %>%
   dplyr::mutate(diagnosis = factor(diagnosis, levels = c("AD", "CT", "OTHER"))) %>%
@@ -1389,7 +1277,7 @@ invisible(synLogin(silent=TRUE))
 cqn_save2 <- list("metadata" = md_all_DLPFC_CN_PCC, "counts" = counts_DLPFC_CN_PCC, "dge_cqn" = dge_cqn_DLPFC_CN_PCC)
 output_filename2 <- "ROSMAP_md_counts_cqn_DLPFC_CN_PCC_FINAL.rds"
 saveRDS(cqn_save2 , file = output_filename2)
-synapse_file_object2 <- File(path = "ROSMAP_md_counts_cqn_DLPFC_CN_PCC_FINAL.rds", parent = "syn77539791")
+synapse_file_object2 <- File(path = "ROSMAP_md_counts_cqn_DLPFC_CN_PCC_FINAL.rds", parent = "syn77801889")
 synStore(synapse_file_object2)
 ```
 
